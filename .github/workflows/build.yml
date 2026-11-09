@@ -1,0 +1,83 @@
+name: K7 ITsolutions Remote Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  flutter-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            build_target: android
+            artifact_name: android-apk
+            artifact_path: source/apps/mobile/build/app/outputs/flutter-apk/app-release.apk
+          - os: windows-2022
+            build_target: windows
+            artifact_name: windows-exe
+            artifact_path: source/apps/mobile/build/windows/x64/runner/Release/
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract source on Linux
+        if: runner.os == 'Linux'
+        run: unzip k7_itsolutions_source.zip -d source
+
+      - name: Extract source on Windows
+        if: runner.os == 'Windows'
+        run: Expand-Archive -Path k7_itsolutions_source.zip -DestinationPath source
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+
+      - name: Setup Java
+        if: ${{ matrix.build_target == 'android' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Generate platform scaffolding
+        working-directory: source/apps/mobile
+        run: flutter create --project-name k7_itsolutions --platforms=android,windows .
+
+      - name: Install dependencies
+        working-directory: source/apps/mobile
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: source/apps/mobile
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: Test
+        working-directory: source/apps/mobile
+        run: flutter test
+
+      - name: Build Android APK
+        if: ${{ matrix.build_target == 'android' }}
+        working-directory: source/apps/mobile
+        run: flutter build apk --release
+
+      - name: Build Windows desktop
+        if: ${{ matrix.build_target == 'windows' }}
+        working-directory: source/apps/mobile
+        env:
+          CMAKE_GENERATOR: Visual Studio 17 2022
+        run: flutter build windows --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
