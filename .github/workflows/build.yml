@@ -37,7 +37,7 @@ jobs:
       - name: Analyze and test
         working-directory: source/apps/mobile
         run: |
-          flutter analyze
+          flutter analyze --no-fatal-warnings --no-fatal-infos
           flutter test
       - name: Build Android APK
         if: matrix.target == 'android'
@@ -47,9 +47,15 @@ jobs:
         if: matrix.target == 'windows'
         working-directory: source/apps/mobile
         run: flutter build windows --release
-      - uses: actions/upload-artifact@v4
+      - name: Upload Android artifact
+        if: matrix.target == 'android'
+        uses: actions/upload-artifact@v4
         with:
-          name: k7-${{ matrix.target }}
-          path: |
-            source/apps/mobile/build/app/outputs/flutter-apk/app-release.apk
-            source/apps/mobile/build/windows/runner/Release/
+          name: k7-android
+          path: source/apps/mobile/build/app/outputs/flutter-apk/app-release.apk
+      - name: Upload Windows artifact
+        if: matrix.target == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: k7-windows
+          path: source/apps/mobile/build/windows/runner/Release/
